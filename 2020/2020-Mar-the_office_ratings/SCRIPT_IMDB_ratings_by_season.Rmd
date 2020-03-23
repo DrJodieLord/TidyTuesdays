@@ -1,0 +1,129 @@
+---
+title: "TidyTuesday - week 17/03/2020"
+author: "Jodie Lord"
+date: "23/03/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, cache=F}
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, comment="", fig.width = 838, fig.height=700)
+```
+
+### Task:
+
+Data visualisation using IMDB ratings data for "The Office"
+
+Full readme for task available within the **TidyTuesday** github repository, available [here](https://github.com/rfordatascience/tidytuesday/tree/master/data/2020/2020-03-17)
+
+_____________________________
+
+#### Installing and loading libraries
+
+```{r}
+
+#install.packages("schrute")
+library(tidyverse)
+library(RColorBrewer)
+
+```
+
+_____________________________
+
+#### Obtaining and inspecting data
+
+```{r}
+
+# obtaining data
+office_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-17/office_ratings.csv')
+
+# inspecting data
+view(office_ratings)
+dim(office_ratings)
+
+```
+
+_____________________________
+
+#### Preparing data
+
+```{r}
+
+# Creating a series grouping so can plot mean rating by series onto plot:
+
+grouped_ratings<-office_ratings%>%
+  group_by(season)
+ 
+by_series <- grouped_ratings %>% summarise(
+  imdb_rating = mean(imdb_rating))
+
+#head(by_series)
+
+
+# creating table of max ratings by series
+max_rating = office_ratings %>%
+  group_by(season) %>%
+  slice(which.max(imdb_rating))
+
+# head(max_rating)
+
+
+# creating table of min ratings by series
+min_rating = office_ratings %>%
+  group_by(season) %>%
+  slice(which.min(imdb_rating))
+
+# head(min_rating)
+
+```
+
+_____________________________
+
+#### Plotting the data
+
+```{r}
+
+## creating plot named "ratings_plot"
+
+ratings_plot<-ggplot(office_ratings, aes(x = as.factor(season), y = imdb_rating)) + 
+  geom_boxplot(fill="#CCCCCC") +  #boxplot as base
+  stat_summary(fun=mean, colour="blue", geom="point", 
+               shape=18, size=2,show_guide = FALSE) +  #creating a mean point on boxplot
+  geom_text(data = by_series, colour = "blue", size=3, aes(label = sprintf("%0.2f", round(imdb_rating, digits = 2)), y = imdb_rating + 0.08)) + #adding text to confirm mean value above mean point
+  geom_point(data = max_rating, color = "#339900", aes(x = season, y = imdb_rating)) + # colouring point for max rating value in green
+  geom_label(data = max_rating, size=2, color = "#339900", aes(label = title), nudge_y = 0.1) + # adding episode title for max rating in green
+  geom_label(data = max_rating, size=2, color = "#339900", aes(label = imdb_rating), nudge_y = 0.18) + #adding rated value for max rating in green
+  geom_point(data = min_rating, color = "darkred", aes(x = season, y = imdb_rating)) +  # colouring point for min rating value in red
+  geom_label(data = min_rating, size=2, color="darkred", aes(label = title), nudge_y = - 0.1) + # adding episode title for min rating in red
+  geom_label(data = min_rating, size=2, color="darkred", aes(label = imdb_rating), nudge_y = - 0.18) + #adding rated value for min rating in red
+  theme(axis.line = element_line(colour = "black"), #adding axis border
+        panel.grid.major = element_blank(),  #removing grid lines
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        plot.title = element_text(hjust = 0.5, size=20)) +  #formatting title size and to center
+  labs(y = "IMDB Rating", 
+       x = "Season", 
+       title = "The Office - IMDB Ratings by Season", # labelling titles
+            caption="Blue = Series mean 
+       Green = Highest rated episode in series
+       Red = Lowest rated episode in series")   # adding captions to confirm labels (there's definitely a better way to do this but don't know how?! / also would prefer them coloured)
+
+# viewing plot
+ratings_plot
+
+```
+
+_____________________________
+
+#### Saving plot to working directory
+
+```{r}
+
+#png(filename="testofficepng",res=300, width=838, height=700)
+
+#ratings_plot
+
+```
+
+
+### END
