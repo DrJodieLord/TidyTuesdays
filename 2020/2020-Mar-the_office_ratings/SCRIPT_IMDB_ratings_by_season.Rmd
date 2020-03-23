@@ -113,7 +113,7 @@ ratings_plot
 
 ```
 
-_____________________________
+______________________________
 
 #### Saving plot to working directory
 
