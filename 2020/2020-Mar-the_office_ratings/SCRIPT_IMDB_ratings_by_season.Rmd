@@ -49,13 +49,13 @@ _____________________________
 
 ```{r}
 
-# Creating a series grouping so can plot mean rating by series onto plot:
+# Creating a series grouping so can write median rating by series onto plot:
 
 grouped_ratings<-office_ratings%>%
   group_by(season)
  
 by_series <- grouped_ratings %>% summarise(
-  imdb_rating = mean(imdb_rating))
+  imdb_rating = median(imdb_rating))
 
 #head(by_series)
 
@@ -87,12 +87,12 @@ _____________________________
 
 ratings_plot<-ggplot(office_ratings, aes(x = as.factor(season), y = imdb_rating)) + 
   geom_boxplot(fill="#CCCCCC") +  #boxplot as base
-  stat_summary(fun=mean, colour="blue", geom="point", 
-               shape=18, size=2,show_guide = FALSE) +  #creating a mean point on boxplot
-  geom_text(data = by_series, colour = "blue", size=3, aes(label = sprintf("%0.2f", round(imdb_rating, digits = 2)), y = imdb_rating + 0.08)) + #adding text to confirm mean value above mean point
+  stat_summary(fun=median, colour="blue", geom="point", 
+               shape=18, size=2,show_guide = FALSE) +  #creating a median point on boxplot
+  geom_text(data = by_series, colour = "blue", size=2, aes(label = sprintf("%0.2f", round(imdb_rating, digits = 2)), y = imdb_rating + 0.08)) + #adding text to confirm mean value above mean point
   geom_point(data = max_rating, color = "#339900", aes(x = season, y = imdb_rating)) + # colouring point for max rating value in green
-  geom_label(data = max_rating, size=2, color = "#339900", aes(label = title), nudge_y = 0.1) + # adding episode title for max rating in green
-  geom_label(data = max_rating, size=2, color = "#339900", aes(label = imdb_rating), nudge_y = 0.18) + #adding rated value for max rating in green
+  geom_label(data = max_rating, size=2, color = "darkgreen", aes(label = title), nudge_y = 0.1) + # adding episode title for max rating in green
+  geom_label(data = max_rating, size=2, color = "darkgreen", aes(label = imdb_rating), nudge_y = 0.18) + #adding rated value for max rating in green
   geom_point(data = min_rating, color = "darkred", aes(x = season, y = imdb_rating)) +  # colouring point for min rating value in red
   geom_label(data = min_rating, size=2, color="darkred", aes(label = title), nudge_y = - 0.1) + # adding episode title for min rating in red
   geom_label(data = min_rating, size=2, color="darkred", aes(label = imdb_rating), nudge_y = - 0.18) + #adding rated value for min rating in red
@@ -104,9 +104,9 @@ ratings_plot<-ggplot(office_ratings, aes(x = as.factor(season), y = imdb_rating)
   labs(y = "IMDB Rating", 
        x = "Season", 
        title = "The Office - IMDB Ratings by Season", # labelling titles
-            caption="Blue = Series mean 
-       Green = Highest rated episode in series
-       Red = Lowest rated episode in series")   # adding captions to confirm labels (there's definitely a better way to do this but don't know how?! / also would prefer them coloured)
+            caption="Blue = Median rating score within season
+       Green = Highest rated episode in season
+       Red = Lowest rated episode in season")   # adding captions to confirm labels (there's definitely a better way to do this but don't know how?! / also would prefer them coloured)
 
 # viewing plot
 ratings_plot
