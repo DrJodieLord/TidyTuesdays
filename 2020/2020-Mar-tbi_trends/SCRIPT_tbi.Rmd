@@ -1,0 +1,268 @@
+---
+title: "Traumatic Brain Injury"
+author: "Jodie Lord"
+date: "28/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, comment="")
+```
+
+### Task:
+
+Use data from civilian and military populations to visualise type and frequency of traumatic brain injury, to help spread awareness for brain injury awareness month.
+
+Full readme for task available within the **R for Data Science, TidyTuesday** github repository, available [here](https://github.com/rfordatascience/tidytuesday/tree/master/data/2020/2020-03-24)
+
+_____________________________
+
+#### Installing and loading libraries
+
+
+```{r, message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(RColorBrewer)
+#install.packages("pdftools")
+library(patchwork)
+library(cowplot)
+library(ggtext)
+
+```
+
+_____________________________
+
+#### Obtaining and inspecting data
+
+
+```{r, message=FALSE, warning=FALSE}
+
+tbi_age <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-24/tbi_age.csv')
+
+tbi_age %>%
+  head()  
+  
+tbi_age %>%  
+  dim() %>% 
+
+distinct(tbi_age, type)
+distinct(tbi_age, age_group)
+
+
+```
+
+_____________________________
+
+#### Preparing data
+
+```{r, message=FALSE, warning=FALSE}
+
+# renaming variables  
+tbi_age$injury_mechanism<-recode(tbi_age$injury_mechanism, "Unintentional Falls"="Unintentional Fall", 
+       "Unintentionally struck by or against an object"="Unintentionally Struck", 
+       "Other unintentional injury, mechanism unspecified"="Mechanism Unspecified",
+       "Motor Vehicle Crashes"="Motor Vehicle Crash",
+       "Other or no mechanism specified"="Other/Unspecified")
+
+# Creating factor levels for groups
+tbi_age_levels<-c("0-4",
+                  "5-14",
+                  "15-24",
+                  "25-34",
+                  "35-44",
+                  "45-54",
+                  "55-64",
+                  "65-74",
+                  "75+")
+
+tbi_type_levels<-c("Hospitalizations",
+                  "Deaths",
+                  "Emergency Department Visit")
+
+tbi_unintended_levels<-c("Unintentional Fall",
+                         "Unintentionally Struck",
+                         "Mechanism Unspecified")
+
+
+tbi_intended_levels<-c("Intentional self-harm",
+                       "Motor Vehicle Crash",
+                       "Assault",
+                       "Other/Unspecified")
+
+# filtering out null values and redundant age groups
+tbi_age %<>%
+  filter(!age_group %in% c("Total", "0-17")) %>%
+  drop_na() %>%
+  mutate(age_group=factor(age_group, levels=tbi_age_levels),
+         type=factor(type, levels=tbi_type_levels)) 
+
+
+# generating stratified dataframes
+intentional<-tbi_age %>%
+  filter(type %in% c("Hospitalizations", "Deaths"), !injury_mechanism %in% c("Unintentional Fall","Unintentionally Struck","Mechanism Unspecified")) %>%
+  mutate(injury_mechanism=factor(injury_mechanism, levels=tbi_intended_levels))
+
+
+unintentional_hosp<-tbi_age %>%
+  filter(type == "Hospitalizations", injury_mechanism %in% c("Unintentional Fall","Unintentionally Struck","Mechanism Unspecified")) %>%
+  mutate(injury_mechanism=factor(injury_mechanism, levels=tbi_unintended_levels))
+
+
+unintentional_death<-tbi_age %>%
+  filter(type == "Deaths", injury_mechanism %in% c("Unintentional Fall","Unintentionally Struck","Mechanism Unspecified")) %>%
+  mutate(injury_mechanism=factor(injury_mechanism, levels=tbi_unintended_levels))
+
+
+```
+
+_____________________________
+
+#### Plotting the data
+
+```{r, message=FALSE, warning=FALSE}
+
+
+# generating colour palettes
+tbi_col<-c("#FF9900", "#336699", "#CCCCCC")
+
+tbi_col_int<-c("#FFCC00", "#6699CC", "#336699", "#CCCCCC", "#CCCCCC", "#CCCCCC")
+
+
+# wrapper <- function(x, ...)
+# {
+#   paste(strwrap(x, ...), collapse = "\n")
+# }
+
+
+# generating base plot
+p1<-intentional %>% 
+  ggplot(aes(x = age_group,
+             y = rate_est, fill=injury_mechanism)) +
+  scale_fill_manual(values=tbi_col_int) +
+  facet_wrap(~type, nrow = 1, strip.position = "top") +
+  geom_bar(stat="identity", width=0.7, colour="black") +
+  labs(y = "Rate per 100,000", 
+       x = "", 
+       subtitle = "<span style='color:#6699CC'>**Motor vehicle crashes**</span> <span style='color:#666666'>pose the greatest known risk for TBI related</span> <span style='color:#6699CC'>**hospitaliztion**</span>.
+<br><span style='color:#FFCC00'>**Intentional self-harm**</span><span style='color:#666666'> pose the greatest risk for TBI related </span><span style='color:#FFCC00'>**deaths**</span><span style='color:#666666'> in adult populations.</span>
+<br>**Over 75s** <span style='color:#666666'>represent the </span>**highest risk age group overall** <span style='color:#666666'>for hospitalization or death due to TBI</span>") +
+  ggtitle("<span style='color:#003399'>**CAUSES AND CONSEQUENCES OF TRAUMATIC BRAIN INJURY ACROSS AGES**
+<br>----------------------------------------------------------------------------------------------------------------</span><br><br><span style='color:#666666'>Mechanisms of </span>**intentional injury**<span style='color:#666666'> posing greatest </span>**risk of hospitalization differ from**<span style='color:#666666'> <br> mechanisms posing greatest </span>**risk of death**") +
+    theme(legend.title=element_blank(),
+          panel.grid.major = element_blank(),  
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          strip.text.x = element_text(size=12, face="bold"),
+          plot.title=element_markdown(hjust=0),
+          plot.subtitle=element_markdown(face = "italic", size=10))
+  
+# adding annotation text to deaths facet
+dat_text <- data.frame(
+  label = c("", "Deaths due to self-harm begin 
+increasing from age 15."),
+  type   = c("Hospitalizations", "Deaths"),
+  injury_mechanism = c("Other/Unspecified", "Assault"),
+  x     = c(2, 4),
+  y     = c(80,60)
+)
+
+# adding arrow data to deaths facet
+arrow_dat<-data.frame(type= c("Hospitalizations", "Deaths"),
+  injury_mechanism = c("Other/Unspecified", "Assault"),
+  x=c(0,4), xend=c(0.01,3), y=c(0,50), yend=c(0.01,20))
+
+# adding annotation text and arrow to base plot
+p1<-p1 + geom_text(
+  data    = dat_text, size=2.5, fontface="italic", hjust=0.5,
+  mapping = aes(x = x, y = y, label = label)
+)+
+  geom_curve(data=arrow_dat, 
+             aes(x=x, y=y, xend=xend, yend=yend),
+             inherit.aes=FALSE,arrow=arrow(length= unit(0.07, "npc")), linetype = 2, curvature = -0.2)
+
+
+
+# generating second plot to visualise hospitalizations as a result of unintentional injuries
+p2<-unintentional_hosp %>%
+  ggplot(aes(x = age_group,
+             y = rate_est,
+             group=injury_mechanism,
+             color=injury_mechanism)) +
+    scale_color_manual(values=tbi_col) +
+  geom_point() +
+  geom_line(size=1) +
+  ggtitle("**Hopitalization**<span style='color:#666666'> due to</span> **unintentional falls**<span style='color:#666666'> show small peak in infant age groups <br>and</span> **peak sharply**<span style='color:#666666'> again</span> **in the elderly**") +
+  labs (y="Rate per 100,000",
+        x= "Age group",
+        subtitle = "<span style='color:#336699'>**Hospitalization**</span><span style='color:#666666'> due to</span><span style='color:#336699'> **other unintentional injuries**</span><span style='color:#666666'> remain comparably</span><span style='color:#336699'> **low**</span><span style='color:#666666'> across all age groups.</span><br>
+        <span style='color:#FF9900'>**Deaths** </span><span style='color:#666666'>due to</span> <span style='color:#FF9900'>**unintentional falls**</span><span style='color:#666666'> (dashed orange line) are less likely in infants, but follow a similar <br></span><span style='color:#FF9900'>**upward risk**</span><span style='color:#666666'> in the </span><span style='color:#FF9900'>**elderly**</span><br>",
+        caption="
+        Graphic by: @jodielord5
+        #TidyTuesday #BrainInjuryAwarenessMonth 
+        Data source: www.cdc.gov/traumaticbraininjury/data | Year of Data: 2014 " ) +
+    theme(legend.position="none",
+        plot.title=element_markdown(),
+        plot.subtitle=element_markdown(face = "italic", size=10),
+        plot.caption = element_text(face="italic", color="grey"),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_line(color="lightgrey"),
+          panel.border = element_blank()) 
+
+# creating new df subset confirming deaths caused by unintentional falls
+fall_death<-unintentional_death%>%
+  filter(injury_mechanism=="Unintentional Fall")
+
+# adding in unintentional death info for more context
+p3<-p2+geom_line(data=fall_death, size=0.5, linetype="dashed", color="orange", aes(x = age_group, y = rate_est)) +
+  annotate("text",
+           x=8.9,
+           y=84,
+           label=c("Unintentional fall 
+deaths"),
+           fontface="italic",
+           size=2.8,
+           color="#FF9900")
+
+
+# generating line annotations
+direct_labels<-unintentional_hosp %>%
+  group_by(injury_mechanism) %>%
+  summarize(y=max(rate_est)) 
+
+
+direct_labels_axis<-axis_canvas(p3, axis="y")+
+  geom_text(
+    data=direct_labels,
+    aes(y=y, label=injury_mechanism),
+    x=-0.2,
+    size=3.3,
+    color=tbi_col,
+    fontface="bold",
+    hjust=0)
+
+
+# inserting line annotations into visualisation
+p_direct_labels<-insert_yaxis_grob(p3,direct_labels_axis)
+#ggdraw(p_direct_labels)
+
+# using patchwork to see both visualisations in single pane
+final<-ggdraw(p1) /  ggdraw(p_direct_labels) 
+
+
+# saving as image
+ggsave("output_tbi.png",
+  plot = final,
+  width = 9,
+  height = 12,
+  units = c("in", "cm", "mm"),
+  dpi = 300,
+)
+
+
+## END
+
+```
+
+
