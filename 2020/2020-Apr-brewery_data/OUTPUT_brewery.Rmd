@@ -1,0 +1,366 @@
+---
+title: "Brewery Data"
+author: "Jodie Lord"
+date: "05/04/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, cache=F}
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, comment="")
+```
+
+### Task:
+
+Data visualisation using data from the Alcohol and Tabacco Tax and Trade Bureau
+
+Full readme for task available within the **TidyTuesday** github repository, available [here](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-03-31/readme.md)
+
+_____________________________
+
+#### Installing and loading libraries
+
+```{r}
+
+library(tidyverse)
+library(RColorBrewer)
+library(patchwork)
+library(ggtext)
+library(gghighlight)
+library(skimr)
+#library(gganimate) # doesn't work with patchwork :(
+#library(hrbrthemes)
+#library(gifski) #for outputting animated gifs
+
+
+```
+
+_____________________________
+
+#### Obtaining and inspecting data
+
+```{r}
+
+## obtaining data:
+beer_states <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-31/beer_states.csv')
+
+
+# inspecting beer_states data
+beer_states %>% 
+  view() #4 cols - state, year, barrels, type
+
+beer_states %>% 
+  skim() #19 missing barrel values
+
+# checking rows with missing barrel values:
+beer_states %>%
+  filter(is.na(barrels)) 
+
+# checking n for states and for type
+beer_states %>%
+  distinct(state) %>% 
+  view()# 51 states, 1 total (52 rows)
+
+beer_states %>%
+  distinct(type) %>% 
+  view() #3 types - bottles and cans, kegs and barrels, on premises
+
+
+```
+
+_____________________________
+
+#### Preparing data
+
+```{r}
+
+# getting state wih 1) top first value, 2) top latest value, and 3) top change 4) worst change for each brewing type
+## THIS IS DEFINITELY THE MOST LONG WINDED AND CLUNKY WAY POSSIBLE TO GET THIS INFORMATION!! ... But works for now...
+
+# filtering to bottle and cans data: 
+bottle_data_all<-beer_states %>% 
+  filter(state !="total", type=="Bottles and Cans")  # filtering to bottle and can data only and removing "total"
+
+# filtering out required info
+bottle_data<-bottle_data_all %>%
+  group_by(state, year) %>% 
+  summarise(barrels=sum(barrels)) %>% 
+  mutate(first = dplyr::first(na.omit(barrels)), #creating column named first which confirms first available value for state (first value which is not na)
+    last = dplyr::last(na.omit(barrels))) %>% #creating column named last which confirms latest available value for state (last value which is not na)
+  distinct(state, .keep_all=TRUE) %>% # filtering rows to one per state
+  mutate(change=(last-first)) %>% # creating column named change which subtracts the latest value from first value to confirm total change in barrels produced over time
+  ungroup()
+
+bottle_flc<-c((bottle_data %>% 
+  arrange(desc(first)) %>% #ordering by state with highest FIRST total barrels produced
+  head(1) %>% #taking first row only (top state)
+  pull(state)), #pulling the state name and adding it as first var in my vector
+  
+  (bottle_data %>% 
+     arrange(desc(last)) %>% #ordering by state with highest LATEST total barrels produced
+     head(1) %>% #taking first row only 
+     pull(state)),#pulling the state name and adding it as second var in my vector
+  
+  (bottle_data %>% 
+     arrange(desc(change)) %>% #ordering my greatest change desc 
+     head(1) %>%  #taking first row only (GREATEST INCREASE)
+     pull(state)), #pulling the state name and adding it as third var in my vector
+  
+  (bottle_data %>%
+     arrange(desc(change)) %>% #ordering my greatest change desc
+     tail(1) %>% #taking the last row only (GREATEST DECREASE)
+     pull(state))) #pulling the state name and adding it as fourth var in my vector
+
+#checking vector info:
+bottle_flc %>%
+  print()
+
+
+# same for keggs and barrels data: 
+kegs_data_all<-beer_states %>% 
+  filter(state !="total", type=="Kegs and Barrels")  # see comments above for info on steps
+  
+kegs_data<-kegs_data_all %>% 
+  group_by(state, year) %>% 
+  summarise(barrels=sum(barrels)) %>% 
+ mutate(
+    first = dplyr::first(na.omit(barrels)), 
+    last = dplyr::last(na.omit(barrels))) %>% 
+  distinct(state, .keep_all=TRUE) %>% 
+  mutate(change=(last-first)) %>% 
+  ungroup()
+
+kegs_flc<-c((kegs_data %>% 
+  arrange(desc(first)) %>% 
+  head(1) %>% #taking first row only (GREATEST FIRST)
+  pull(state)), 
+  
+  (kegs_data %>% 
+     arrange(desc(last)) %>% 
+     head(1) %>%  #taking first row only (GREATEST LATEST)
+     pull(state)),
+  
+  (kegs_data %>% 
+     arrange(desc(change)) %>%  
+     head(1) %>%  #taking first row only (GREATEST INCREASE)
+     pull(state)), 
+  
+  (kegs_data %>%
+     arrange(desc(change)) %>% 
+     tail(1) %>% #taking the last row only (GREATEST DECREASE)
+     pull(state))) 
+
+#checking vector info:
+kegs_flc %>%
+  print()
+
+
+
+# same for on premises data: 
+premise_data_all<-beer_states %>% 
+  filter(state !="total", type=="On Premises") # see comments above for info on steps
+  
+premise_data <- premise_data_all %>% 
+  group_by(state, year) %>% 
+  summarise(barrels=sum(barrels)) %>% 
+ mutate(
+    first = dplyr::first(na.omit(barrels)), 
+    last = dplyr::last(na.omit(barrels))) %>% 
+  distinct(state, .keep_all=TRUE) %>% 
+  mutate(change=(last-first)) %>% 
+  ungroup()
+
+premise_flc<-c((premise_data %>% 
+  arrange(desc(first)) %>% 
+  head(1) %>% #taking first row only (GREATEST FIRST)
+  pull(state)), 
+  
+  (premise_data %>% 
+     arrange(desc(last)) %>% 
+     head(1) %>%  #taking first row only (GREATEST LATEST)
+     pull(state)),
+  
+  (premise_data %>% 
+     arrange(desc(change)) %>%  
+     head(1) %>%  #taking first row only (GREATEST INCREASE)
+     pull(state)), 
+  
+  (premise_data %>%
+     arrange(desc(change)) %>% 
+     tail(1) %>% #taking the last row only (GREATEST DECREASE)
+     pull(state))) 
+
+#checking vector info:
+premise_flc %>%
+  print()
+
+# generating a vector of state names for highlighting in charts
+state_highlight<-c(bottle_flc, kegs_flc, premise_flc) %>%
+  unique()
+
+
+
+# preparing datasets for total production chart --> very messy way of doing it but tired
+
+forline<-total_states %>% 
+  group_by(year) %>%
+  summarise(barrels = sum(barrels)) 
+  
+total_premise<-beer_states %>%
+  drop_na() %>%
+  filter(state =="total", type=="On Premises") 
+
+total_bottle<-beer_states %>%
+  drop_na() %>%
+  filter(state =="total", type=="Bottles and Cans") 
+
+total_kegs<-beer_states %>%
+  drop_na() %>%
+  filter(state =="total", type=="Kegs and Barrels")
+
+```
+
+_____________________________
+
+#### Plotting the data
+
+```{r}
+
+# 1) a linechart for bottle and can production by state --> highlighlting key state info
+
+bottle<-ggplot(bottle_data_all, aes(x=year, y=barrels, group=state), label=state, size=0.75) +
+  geom_line(aes(color=state), show.legend=F) +
+  scale_color_manual(values=c("#CCCCCC", "darkred", "#CCCCCC", "#CCCCCC", "#339999")) + #creating colout palette - highlighting the states that matter
+  gghighlight(                         #using geom highlight to highlight only the states which matter
+    state %in% state_highlight,
+    label_params = list(size = 2, family = 'Arial',   
+                        fill = 'white', alpha = 0.9, 
+                         segment.alpha = 0.3),
+    unhighlighted_params = list(color = 'lightgrey', alpha=0.5)) +
+  scale_x_continuous(breaks = scales::pretty_breaks()) +  #stole pretty_breaks from another repor :)
+    ggtitle("**Bottles and Cans**") +
+    labs (y="",
+        x= "",
+        subtitle = "<span style='color:darkred'>**Colorado:** </span><span style='color:#666666'>Highest overall production. <br> Largest 2008-19 decline.</span><br>
+        <span style='color:#339999'>**Pennsylvania:** </span><span style='color:#666666'>Largest 2008-19 growth.</span>") +
+      theme_minimal() +
+    theme(plot.title=element_markdown(),
+        plot.subtitle=element_markdown(size=9))
+    #labs(title="Year:{frame_reveal}",
+         #x="") +
+  #transition_reveal(along=year)
+#anim_save("state_barrels_by_year.gif")
+
+
+
+# 2) same linechart for keg and barrel production by state 
+
+keg<-ggplot(kegs_data_all, aes(x=year, y=barrels, colour=state)) +
+  geom_line(aes(color=state), show.legend=F) +
+    scale_color_manual(values=c("#CC6600", "darkred", "#CC9900", "#CCCCCC", "#CCCCCC")) +
+  gghighlight(
+    state %in% state_highlight,
+    label_params = list(size = 2, family = 'Arial', 
+                        fill = 'white', alpha = 0.9, 
+                        label.r = 0.1, segment.alpha = 0.5),
+    unhighlighted_params = list(color = 'lightgrey', alpha=0.5)) +
+  scale_x_continuous(breaks = scales::pretty_breaks()) +
+    ggtitle("**Kegs & Barrels**") +
+    labs (y="",
+        x= "",
+        subtitle = "<span style='color:darkred'>**Colorado:** </span><span style='color:#666666'>Highest 2008 production.<br>
+        Largest 2008-19 decline.</span><br>
+        <span style='color:#CC6600'>**California:** </span><span style='color:#666666'>Highest 2019 production.</span><br>
+        <span style='color:#CC9900'>**Michigan:** </span><span style='color:#666666'>Largest 2008-19 growth.</span>") +
+      theme_minimal() +
+    theme(plot.title=element_markdown(),
+        plot.subtitle=element_markdown(size=9))
+    # labs(title="Year:{reveal}",
+    #      x="") +
+  #transition_reveal(along=year)
+
+
+
+# 3) same linechart for premise production by state 
+
+premise<-ggplot(premise_data_all, aes(x=year, y=barrels, colour=state)) +
+  geom_line(aes(color=state), show.legend=F) +
+    scale_color_manual(values=c("#CC6600", "#CCCCCC", "#CCCCCC", "#000066", "#CCCCCC")) +
+  gghighlight(
+    state %in% state_highlight,
+    label_params = list(size = 2, family = 'Arial', 
+                        fill = 'white', alpha = 0.9, 
+                        label.r = 0.1, segment.alpha = 0.5),
+    unhighlighted_params = list(color = 'lightgrey', alpha=0.5)) +
+  scale_x_continuous(breaks = scales::pretty_breaks()) +
+  ggtitle("**On Premises**") +
+    labs (y="",
+        x= "",
+        subtitle = "<span style='color:#CC6600'>**California:** </span><span style='color:#666666'>Highest 2008 production.<br> 
+        Largest 2008-19 growth.</span><br>
+        <span style='color:#000066'>**Nevada:** </span><span style='color:#666666'>Smallest 2008-19 growth.</span>",
+        caption="
+        Graphic by: Jodie Lord | @jodielord5
+        #TidyTuesday #R4DS
+        Source: Alcohol and Tabacco Tax and Trade Bureau" ) + #adding caption to this chart as will appear in bottle right when all charts combined together using patchwork.
+      theme_minimal() +
+    theme(plot.title=element_markdown(),
+        plot.subtitle=element_markdown(size=9),
+        plot.caption = element_text(color="#999999")) #+
+    # labs(title="Year:{reveal}",
+    #      x="") +
+  #transition_reveal(along=year)
+
+
+
+# 4) total barchart across all states, with brewing type overlayed:
+
+total_production<-ggplot() + 
+     geom_col(forline, mapping=aes(x=factor(year), y=barrels), alpha=0.5, width = 0.6) +
+    stat_summary(total_premise, mapping=aes(factor(year), barrels, colour=type), fun.y = "sum", geom = "line", group = 1, size=1, linetype="dashed", colour="#660000", alpha=0.7) + #overlaying line chart for premise specific production onto visualisation --> note, can't use geom_line due to discrete x-axis, so using summary anf fun.y as workaround.
+    stat_summary(total_bottle, mapping=aes(factor(year), barrels, colour=type), fun.y = "sum", geom = "line", group = 1, size=1, linetype="dashed", colour="#000066", alpha=0.7) + #overlaying line chart for bottle/can specific production
+        stat_summary(total_kegs, mapping=aes(factor(year), barrels, colour=type), fun.y = "sum", geom = "line", group = 1, size=1, linetype="dashed", colour="#006666", alpha=0.7) + #overlaying line chart for keg/barrel specific production
+      ggtitle("<br>Total beer production across 51 American States, has decreased between 2008-2019") +
+  labs (y="Total barrels produced",
+        x= "",
+        subtitle = "<span style='color:#000066'>**Bottles and cans** </span><span style='color:#666666'>show the </span><span style='color:#000066'>**highest total production** </span><span style='color:#666666'>across all years, though </span><span style='color:#000066'>**production has decreased** </span><span style='color:#666666'>across years.</span><br>
+                <span style='color:#666666'>Total production of </span><span style='color:#006666'>**Kegs and Barrels** </span><span style='color:#666666'>appears </span><span style='color:#006666'>**largely constant** </span><span style='color:#666666'>across time.</span><br>
+        <span style='color:#666666'>Barrels produced </span><span style='color:#660000'>**On Premise** </span><span style='color:#666666'>show the </span><span style='color:#660000'>**lowest total production**</span><span style='color:#666666'> but production shows an </span><span style='color:#660000'>**upward trend**</span><span style='color:#666666'> in recent years. </span>") +
+        # caption="
+        # Graphic by: Jodie Lord | @jodielord5
+        # #TidyTuesday #R4DS
+        # Source: Alcohol and Tabacco Tax and Trade Bureau" ) + 
+    theme_minimal() +
+    theme(plot.title=element_markdown(face="bold", size=16),
+        plot.subtitle=element_markdown(size=11))
+
+
+# combining all plots together in one view, using patchwork    
+all_plots<-total_production /
+  (bottle | keg | premise)
+
+
+# viewing visualisation
+all_plots
+
+```
+
+______________________________
+
+#### Saving plot to working directory
+
+```{r}
+
+#saving visualisation
+ggsave("output_brewery.png",
+  plot = all_plots,
+  width = 10,
+  height = 10,
+  units = c("in", "cm", "mm"),
+  dpi = 300,
+)
+
+```
+
+
+### END
