@@ -28,6 +28,7 @@ library(patchwork)
 library(ggtext)
 library(gghighlight)
 library(skimr)
+library(scales)
 #library(gganimate) # doesn't work with patchwork :(
 #library(hrbrthemes)
 #library(gifski) #for outputting animated gifs
@@ -202,7 +203,9 @@ state_highlight<-c(bottle_flc, kegs_flc, premise_flc) %>%
 
 # preparing datasets for total production chart --> very messy way of doing it but tired
 
-forline<-total_states %>% 
+total_states<-beer_states %>% 
+  drop_na() %>%
+  filter(state =="total") %>% 
   group_by(year) %>%
   summarise(barrels = sum(barrels)) 
   
@@ -238,13 +241,15 @@ bottle<-ggplot(bottle_data_all, aes(x=year, y=barrels, group=state), label=state
                          segment.alpha = 0.3),
     unhighlighted_params = list(color = 'lightgrey', alpha=0.5)) +
   scale_x_continuous(breaks = scales::pretty_breaks()) +  #stole pretty_breaks from another repor :)
-    ggtitle("**Bottles and Cans**") +
-    labs (y="",
+  ggtitle("**Bottles and Cans**") +
+  labs (y="Total barrels produced",
         x= "",
-        subtitle = "<span style='color:darkred'>**Colorado:** </span><span style='color:#666666'>Highest overall production. <br> Largest 2008-19 decline.</span><br>
+        subtitle = "<span style='color:darkred'>**Colorado:** </span><span style='color:#666666'>Highest overall production &<br> 
+        largest 2008-19 decline.</span><br>
         <span style='color:#339999'>**Pennsylvania:** </span><span style='color:#666666'>Largest 2008-19 growth.</span>") +
-      theme_minimal() +
-    theme(plot.title=element_markdown(),
+  scale_y_continuous(breaks = seq(0, 25000000, by = 5000000), labels = number) +
+  theme_minimal() +
+  theme(plot.title=element_markdown(),
         plot.subtitle=element_markdown(size=9))
     #labs(title="Year:{frame_reveal}",
          #x="") +
@@ -268,12 +273,13 @@ keg<-ggplot(kegs_data_all, aes(x=year, y=barrels, colour=state)) +
     ggtitle("**Kegs & Barrels**") +
     labs (y="",
         x= "",
-        subtitle = "<span style='color:darkred'>**Colorado:** </span><span style='color:#666666'>Highest 2008 production.<br>
-        Largest 2008-19 decline.</span><br>
+        subtitle = "<span style='color:darkred'>**Colorado:** </span><span style='color:#666666'>Highest 2008 production &<br>
+        largest 2008-19 decline.</span><br>
         <span style='color:#CC6600'>**California:** </span><span style='color:#666666'>Highest 2019 production.</span><br>
         <span style='color:#CC9900'>**Michigan:** </span><span style='color:#666666'>Largest 2008-19 growth.</span>") +
-      theme_minimal() +
-    theme(plot.title=element_markdown(),
+  scale_y_continuous(breaks = seq(0, 2600000, by = 500000), labels = number) +
+  theme_minimal() +
+  theme(plot.title=element_markdown(),
         plot.subtitle=element_markdown(size=9))
     # labs(title="Year:{reveal}",
     #      x="") +
@@ -296,15 +302,16 @@ premise<-ggplot(premise_data_all, aes(x=year, y=barrels, colour=state)) +
   ggtitle("**On Premises**") +
     labs (y="",
         x= "",
-        subtitle = "<span style='color:#CC6600'>**California:** </span><span style='color:#666666'>Highest 2008 production.<br> 
-        Largest 2008-19 growth.</span><br>
+        subtitle = "<span style='color:#CC6600'>**California:** </span><span style='color:#666666'>Highest 2008 production &<br> 
+        largest 2008-19 growth.</span><br>
         <span style='color:#000066'>**Nevada:** </span><span style='color:#666666'>Smallest 2008-19 growth.</span>",
         caption="
         Graphic by: Jodie Lord | @jodielord5
         #TidyTuesday #R4DS
         Source: Alcohol and Tabacco Tax and Trade Bureau" ) + #adding caption to this chart as will appear in bottle right when all charts combined together using patchwork.
-      theme_minimal() +
-    theme(plot.title=element_markdown(),
+  scale_y_continuous(breaks = seq(0, 400000, by = 80000), labels = number) +
+  theme_minimal() +
+  theme(plot.title=element_markdown(),
         plot.subtitle=element_markdown(size=9),
         plot.caption = element_text(color="#999999")) #+
     # labs(title="Year:{reveal}",
@@ -316,7 +323,7 @@ premise<-ggplot(premise_data_all, aes(x=year, y=barrels, colour=state)) +
 # 4) total barchart across all states, with brewing type overlayed:
 
 total_production<-ggplot() + 
-     geom_col(forline, mapping=aes(x=factor(year), y=barrels), alpha=0.5, width = 0.6) +
+     geom_col(total_states, mapping=aes(x=factor(year), y=barrels), alpha=0.5, width = 0.6) +
     stat_summary(total_premise, mapping=aes(factor(year), barrels, colour=type), fun.y = "sum", geom = "line", group = 1, size=1, linetype="dashed", colour="#660000", alpha=0.7) + #overlaying line chart for premise specific production onto visualisation --> note, can't use geom_line due to discrete x-axis, so using summary anf fun.y as workaround.
     stat_summary(total_bottle, mapping=aes(factor(year), barrels, colour=type), fun.y = "sum", geom = "line", group = 1, size=1, linetype="dashed", colour="#000066", alpha=0.7) + #overlaying line chart for bottle/can specific production
         stat_summary(total_kegs, mapping=aes(factor(year), barrels, colour=type), fun.y = "sum", geom = "line", group = 1, size=1, linetype="dashed", colour="#006666", alpha=0.7) + #overlaying line chart for keg/barrel specific production
@@ -330,8 +337,9 @@ total_production<-ggplot() +
         # Graphic by: Jodie Lord | @jodielord5
         # #TidyTuesday #R4DS
         # Source: Alcohol and Tabacco Tax and Trade Bureau" ) + 
-    theme_minimal() +
-    theme(plot.title=element_markdown(face="bold", size=16),
+  scale_y_continuous(labels=number) +
+  theme_minimal() +
+  theme(plot.title=element_markdown(face="bold", size=16),
         plot.subtitle=element_markdown(size=11))
 
 
@@ -352,7 +360,7 @@ ______________________________
 ```{r}
 
 #saving visualisation
-ggsave("output_brewery.png",
+ggsave("OUTPUT_brewery.png",
   plot = all_plots,
   width = 10,
   height = 10,
