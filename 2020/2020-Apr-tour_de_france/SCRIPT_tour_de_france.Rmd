@@ -1,0 +1,191 @@
+---
+title: "Tour De France"
+author: "Jodie Lord"
+date: "12/04/2020"
+output: html_document
+---
+
+### Task:
+
+Tour De France data visualisation
+
+Full readme for task available within the **TidyTuesday** github repository, available [here](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-04-07/readme.md)
+
+_____________________________
+
+#### Installing and loading libraries
+
+```{r}
+
+library(tidyverse)
+library(ggtext)
+library(lubridate)
+library(skimr)
+library(scales)
+library(ggrepel)
+library(gganimate) 
+library(gifski) #for outputting animated gifs
+
+
+```
+
+_____________________________
+
+#### Obtaining and inspecting data
+
+```{r}
+
+## obtaining data:
+
+tdf_winners <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-04-07/tdf_winners.csv')
+
+## viewing
+tdf_winners %>% 
+  view()
+
+tdf_winners %>% 
+  skim()    #19 cols, 106 rows. 8 overall finish times missing
+
+## checking dates of missing times
+tdf_winners %>%
+  filter(is.na(time_overall)) %>% 
+  view()    #cluster of time from 1905-1912 missing - keep missing years in so can can be visualised as gap in trend data - so obvious to viewer data for those yrs = missing.
+
+# checking which countries have greatest number of wins:
+tdf_winners %>% 
+  count(nationality) %>%
+  arrange(desc(n))   # France has greatest number of wins (36/106). USA=10/106. UK=6/106
+  
+
+# visualising overall trend of finishing time (total hours) over tdf years
+tdf_winners %>% 
+  ggplot(aes(x=start_date, y=time_overall), size=0.75) +
+  geom_line(aes()) # overall time has gone down over time
+# first couple of years look unusually low.
+
+# visualing overall trend of full race distance (km) travelled by winner across tdf years
+tdf_winners %>% 
+  ggplot(aes(x=start_date, y=distance), size=0.75) +
+  geom_line(aes()) # but distance covered has also become shorter..
+
+
+# creating var: km_per_hr to account for finishing time given distance travelled:
+av_dist<-tdf_winners %>% 
+  mutate(km_per_hr=distance/time_overall) 
+  
+# checking km_per_hr over time:
+av_dist %>% 
+  ggplot(aes(x=start_date, y=km_per_hr), size=0.5) +
+  geom_line(aes()) 
+
+
+```
+
+_____________________________
+
+#### Preparing data
+
+```{r}
+
+# trimming white space from front of character strings so can filter this column
+tdf_winners$nationality<-str_trim(tdf_winners$nationality)
+
+# setting up new columns for use in chart
+base_plot <- tdf_winners %>% 
+  mutate(km_per_hr=distance/time_overall) %>% 
+  mutate(race_year=as.integer(format(start_date,'%Y'))) 
+
+# filtering out france (as most frequent wins) and creating highlights commentary
+france<-base_plot %>%
+   filter(nationality=="France") %>% 
+  mutate(Highlights=paste(nationality, ": Nation with first & most frequent wins (36/106)", sep="")) 
+
+# filtering out fastest winner and creating highlights commentary
+fastest<-base_plot %>%
+  arrange(desc(km_per_hr)) %>%
+   head(1) %>%
+  mutate(Highlights=paste(winner_name, ": Winner with fastest recorded speed (41.7km/hr)", sep=""))
+
+# filtering Armstrong rows and creating highlights commentary
+armstrong<-base_plot %>%
+  filter(winner_name=="Lance Armstrong") %>%
+  mutate(Highlights=paste(winner_name, ": 7 win streak before doping scandal", sep="")) 
+
+# creating table ready to add highlights to visualistion
+plot_highlights<-france %>% 
+  rbind(fastest,armstrong)
+
+
+```
+
+
+_____________________________
+
+#### Plotting data
+
+```{r}
+
+tdf<- base_plot %>%
+  ggplot(aes(x=race_year, y=km_per_hr)) +
+  geom_line(aes(),alpha=0.7, size=1) + 
+  geom_point(aes(), alpha=0.7, size=1.5) + # adding base points across all winners
+  geom_point(data=plot_highlights, aes(color=Highlights, group=seq_along(Highlights)), alpha=0.6, size=3) + # adding coloured highlight points for france, Lance Armstrong and Marco
+  scale_color_manual(values=c("darkgreen", "darkred", "orange")) + #setting colours for highlighted points
+  # geom_label_repel(data=france %>% 
+  #                    head(1), aes(label=nationality, group=seq_along(nationality)), size=3.5, colour="darkgreen", nudge_y=0.5) +
+  geom_label_repel(data=fastest, aes(label=winner_name, group=seq_along(winner_name)), size=4, colour="orange", nudge_y=5, nudge_x=-6) + # adding label to highlight Marco
+  # geom_label_repel(data=armstrong %>% 
+  #                    head(1), aes(label=winner_name, group=seq_along(winner_name)), size=3.5, colour="darkred", nudge_y=-2, nudge_x=5) +
+  theme_minimal() +
+  theme(plot.title=element_markdown(size=20),
+        plot.subtitle=element_text(size=14),
+        legend.text=element_text(size=13),
+        legend.title=element_text(size=14, face="bold"),
+        plot.caption = element_text(color="#999999", size=13),
+        axis.line = element_line(colour = "grey"), #adding axis border
+        panel.grid.minor = element_blank()) +
+  scale_x_continuous(breaks = seq(1900, 2020, by = 10)) + #creating more frequent x-axis breaks
+  transition_reveal(along=race_year) + #using gganimate to create animation
+  ease_aes('linear', interval = 0.001) + #setting eas for gganimate
+  labs(title="**Tour De France Winners Have Become Faster Over Time**<br>",
+       y='Average Speed: KM per Hour',
+       x= '',
+       caption="
+        Graphic by: Jodie Lord | @jodielord5
+        #TidyTuesday #R4DS",
+        subtitle ='Race Year: {frame_along}') #creating dynamic subtitle with gganimate
+
+
+```
+
+
+______________________________
+
+#### Saving plot to working directory
+
+```{r}
+# setting dimensions and speed of animation
+output<-animate(tdf,
+        duration=25,
+        end_pause=40,
+        height=700,
+        width=1000,
+        fps=15)
+
+# saving visualisation as gif
+anim_save("OUTPUT_tour_de_france.gif", animation = output)
+
+
+# saving static version
+ggsave("STATIC_VERSION_tdf.png",
+  plot = output,
+  width = 14,
+  height = 10,
+  units = c("in", "cm", "mm"),
+  dpi = 300,
+)
+
+```
+
+
+### END
