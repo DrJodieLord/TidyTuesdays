@@ -1,0 +1,250 @@
+---
+title: "Hip-hop Ratings"
+author: "Jodie Lord"
+date: "19/04/2020"
+output: html_document
+---
+
+
+### Task:
+
+Data visualisation for BBC ratings of Hip-hop artists and songs over time
+
+Full readme for task available within the **TidyTuesday** github repository, available [here](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-04-14/readme.md)
+
+_____________________________
+
+#### Installing and loading libraries
+
+```{r}
+
+library(tidyverse)
+library(ggtext)
+#library(lubridate)
+library(skimr)
+library(scales)
+library(ggrepel)
+library(patchwork)
+library(forcats)
+
+
+```
+
+_____________________________
+
+#### Obtaining and inspecting data
+
+```{r}
+
+
+## obtaining data rankings data:
+rankings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-04-14/rankings.csv')
+
+## viewing rankings
+rankings %>% 
+  view()
+
+rankings %>% 
+  skim()  # no missing data  
+
+# checking range of years
+rankings %>% 
+  arrange(year) %>% 
+  distinct(year)
+
+
+```
+
+_____________________________
+
+#### Preparing data
+
+```{r}
+
+##! Preparing rankings data for main scatter plot
+
+rankings<-rankings %>% 
+  mutate(for_colours=ifelse(ID<=30, gender, "grey"), # new column to colour top 30 labels seperately to all others
+         for_labels=paste(artist," \n(" ,title, ")", sep=""), # new column to combine artist and title names for adding as labels to vis
+         gender=factor(gender, levels=c("male", "female", "mixed")),
+         for_colours=factor(for_colours, levels=c("male", "female", "mixed", "grey")))
+
+
+# Removing tail end of long string from Grandmaster Flash and The Furious 5
+rankings$for_labels<-str_remove(rankings$for_labels, "& The Furious Five") 
+
+# Checking labels 
+rankings %>% 
+  view()
+
+##! Preparing seperate data for donut chart of gender splits
+for_donut<-rankings %>% 
+  group_by(gender) %>% 
+  summarise(total=n())  %>% 
+  mutate(fraction=total/sum(total), 
+         pcnt=round(fraction*100, 1), 
+         ymax=cumsum(fraction), 
+         ymin = c(0, head(ymax, n=-1)),
+         label_pos = (ymax+ymin)/2,
+         gender=factor(gender, levels=c("male", "female", "mixed")))
+
+
+```
+
+
+_____________________________
+
+#### Plotting data
+
+```{r}
+
+##! Visualisation 1: Critic rating annoated scatter by year
+
+by_year_scatter <- rankings %>% 
+  ggplot(aes(x=year, y=points)) + # using geom_jitter to create scatter
+    geom_jitter(position=position_jitter(0.4),  
+                aes(color=for_colours), #colouring by newly generated column so <30 = bulk greyed
+                show.legend=F, alpha=0.8, size=2.5) +
+  scale_color_manual(values=c("darkred", "#CDAA25", "#FF7500", "grey"))  + #colour pallette
+  geom_hline(yintercept = rankings[[30,6]], colour="#666666", linetype="dashed", size=0.75) + #adding a dashed line to depict boundary to top 30 rated songs
+  geom_text(x=2019,
+            aes(y=25, label=paste("↑ Top 30")), 
+            size=3.5, col="#666666") + # adding top 30 label to hline
+  geom_text(x=1995, aes(y=140, label=rankings[[1,14]]), col="#333333", family="Arial", hjust=0, size=3) + # creating top 5 labs - should've done more efficiently but tired.
+  geom_text(x=1981.5, aes(y=102, label=rankings[[2,14]]), col="#333333", family="Arial", hjust=0, size=3) +
+  geom_text(x=1995.75, aes(y=95.3, label=rankings[[3,14]]), col="#333333", family="Arial", hjust=0, size=3) +
+  geom_text(x=1979, aes(y=85.1, label=rankings[[4,14]]), col="#333333", family="Arial", hjust=0, size=3) +
+  geom_text(x=1993, aes(y=81.7, label=rankings[[5,14]]), col="#333333", family="Arial", hjust=0, size=3) +
+  geom_text(x=1990, aes(y=120, label=paste("Golden Era")), col="#666666", hjust=0.5, family="Arial Bold", size=4.5, alpha=0.6) +
+  annotate("rect",
+    xmin = 1985, xmax = 1995,
+    ymin = 0, ymax = rankings[[1,6]]+4,
+    fill="grey70",
+    alpha=0.125) + #adding shaded section for golden era
+  geom_text(data = rankings, size=3, hjust=0.5, 
+            fontface="italic", color="#CDAA25", family="Arial",
+            mapping = aes(x = 2005, y = 55, 
+                          label = "The only females ranked within the top 30: \nQueen Latifa (U.N.I.T.Y) & Lauryn Hill (Doo Wop)") #adding highlighted text for 2 top 30 females
+) +
+  geom_curve(data=rankings, 
+             aes(x=2000, y=50, xend=1993.5, yend=30), alpha=0.5,
+             inherit.aes=FALSE,arrow=arrow(length= unit(0.025, "npc")), linetype = 1, curvature = -0.2, color="#CDAA25") + #adding arrows to join text to points
+  geom_curve(data=rankings, 
+             aes(x=2000, y=50, xend=1998, yend=30), alpha=0.5,
+             inherit.aes=FALSE,arrow=arrow(length= unit(0.025, "npc")), linetype = 1, curvature = -0.2, color="#CDAA25") +
+  theme_minimal() +
+  labs(y="Critic Rating") +
+    theme(panel.grid.major = element_blank(),  
+          panel.grid.minor = element_blank(),
+          axis.line = element_line(colour = "#666666", size=0.5),
+          axis.title.y = element_text(colour = "#666666", family="Arial"),
+          plot.background=element_rect(fill="black", color="black"))
+
+
+
+##! Visualisation 2: Donut chart
+
+gender_donut<-ggplot(for_donut, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=gender)) +
+     geom_rect(show.legend=F, alpha=0.5) + #creating base as a single bar 
+     coord_polar(theta="y") + #adding polar co-odinates to make donut
+     xlim(c(1, 5)) + #smaller = more donutty, larger = more piey :)
+     theme_void() + #getting rid of ugly coordinates
+     scale_fill_manual(values=c("darkred", "#CDAA25", "#FF7500"))  +
+  geom_text(x=3.5, aes(y=label_pos, label=paste(pcnt,"%",sep="")), size=3, col=c("black", "white", "black")) + #adding % labels
+  geom_richtext(aes(label="<span style='color:darkred'> Male<br></span>
+                      <span style='color:#CDAA25'> Female<br></span>
+                      <span style='color:#FF7500'> Mixed Collab<br></span>",
+                    x=1, y=0),
+                fill=NA, label.color=NA,
+                family="Comic Sans MS",
+                size=4) + #addding custom legend to middle of donut
+  geom_text(aes(label="86% of ranked songs were by \nmale artists", x=5, y=0), color="grey", family="Arial Bold", size=4) + # using text label as hacked title, otherwise situates too high up and looks odd
+  labs(caption = "
+        Graphic by: @jodielord5   
+        #TidyTuesday #R4DS   
+        Data source: BBC Music    
+       ") +
+  theme(plot.background=element_rect(fill="black", color="black"),
+        plot.caption = element_text(hjust=1, colour="#666666", size=10))
+
+
+
+
+##! Visualisation 3: Female rankings
+### NOTE: DID NOT END UP USING IN END PATCHWORK ###
+
+# female_rankings<-rankings %>% 
+#   filter(gender=="female") %>% 
+#   head(5) %>% 
+#   arrange(-points) %>% 
+#   mutate(title=factor(title), levels=title,
+#          artist=factor(artist), levels=artist,
+#          title_order=c(5:1),
+#          top30=ifelse(ID<=30, TRUE, FALSE)) %>%
+#   ggplot(aes(x=reorder(title, title_order), y=points, fill=top30)) +
+#   geom_bar(stat="identity", alpha=0.4) +
+#   scale_fill_manual(values=c("grey", "#CDAA25")) +
+#   geom_text(
+#     aes(label = artist, y = points -1), 
+#     color = "black", 
+#     size = 4,
+#     hjust = 1) +
+#   theme(legend.position = "none",
+#         panel.background = element_blank(),
+#         panel.grid.major = element_blank(),  
+#           panel.grid.minor = element_blank(),
+#           axis.line = element_line(colour = "#666666", size=0.5),
+#           plot.background=element_rect(fill="black", color="black")) +
+#   coord_flip()
+
+```
+
+_____________________________
+
+#### Putting everything together
+
+```{r}
+
+##! Combining plots into single visualistion:
+
+#by_year_scatter + (gender_donut/female_rankings) ## taking out female_rankings from patchwork as looks naaaasty
+
+# combining donut and scatter using patchwork:
+combined <- by_year_scatter + gender_donut + plot_layout(widths = c(.6,.4))
+combined
+
+
+# creating final annotations for combined visual
+final<-combined +
+  plot_annotation(title="BBC Music's Top Rated Hip-Hop Songs: 1979:2020",
+                  subtitle = 'Males dominate the top ranks, and the 90s see the "Golden Era" of hip-hop 
+                  ', 
+theme = theme(text=element_text(family="Arial", colour="white"),
+plot.background = element_rect(fill="black",color="black"),
+plot.title = element_text(size=30,hjust=.5, colour="white"),
+plot.subtitle = element_text(size=18,hjust=.5, colour="grey")))
+
+final
+
+
+```
+
+
+______________________________
+
+#### Saving plot to working directory
+
+```{r}
+# saving
+ggsave("OUTPUT_hiphop_ratings.png",
+  plot = final,
+  width = 11,
+  height = 10,
+  units = c("in", "cm", "mm"),
+  dpi = 300,
+)
+
+```
+
+
+### END
