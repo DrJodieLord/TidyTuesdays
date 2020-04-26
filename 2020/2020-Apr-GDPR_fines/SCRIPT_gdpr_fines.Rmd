@@ -136,7 +136,7 @@ for_map %>%
 # filtering countries with extreme fine totals for ggtext
 for_map_extremes <- for_map %>%
   filter(price_legend == ">10M") %>%  #filtering to countries with largest fines
-  mutate(price_label = paste0(name, ": \n", substr(
+  mutate(price_label = paste0(name, "\n", substr(
     as.character(price_sum), start = 1, stop = 2
   ), "M", sep = "")) %>% #creating new label with more precise fine totals
   select(name, latitude, longitude, price_label)
