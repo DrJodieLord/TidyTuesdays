@@ -216,7 +216,7 @@ gdpr_plot <- ggplot(data = for_map) +
     size = 2,
     colour = "#999999"
   ) +
-  labs(title = "Total GDPR Costs Accumulated \nper European Country",
+  labs(title = "Total GDPR Fines Accumulated \nper European Country",
        subtitle = "Graphic by: Jodie Lord | @jodielord5") +
   theme(
     plot.title = element_text(
@@ -264,6 +264,7 @@ ggsave(
   units = c("in", "cm", "mm"),
   dpi = 320,
 )
+
 
 ```
 
