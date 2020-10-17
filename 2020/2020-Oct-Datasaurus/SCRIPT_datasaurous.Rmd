@@ -1,0 +1,202 @@
+---
+title: "Datasaurus"
+author: "Jodie Lord"
+date: "17/10/2020"
+output: html_document
+---
+
+### Task:
+
+Visualising data from the Datasaurus package - 13 sets of x-y data all with same mean, SD, and pearsons correlation.
+
+Full readme for task available within the **TidyTuesday** github repository, available [here](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-10-13/readme.md)
+
+_____________________________
+
+#### Installing and loading libraries
+
+```{r}
+library(tidyverse)
+library(skimr) 
+library(patchwork)
+library(PNWColors)
+library(here)
+```
+
+_____________________________
+
+#### Obtaining and inspecting data
+
+```{r}
+## obtaining data:
+
+dino <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-10-13/datasaurus.csv')
+
+## viewing
+dino %>%
+  view()
+
+#viewing number of datasets
+dino %>% 
+  group_by(dataset) %>% 
+  count() #13 datasets - eaach with 142 points
+
+#skimming info  
+dino %>% 
+  group_by(dataset) %>% 
+  skim()
+```  
+
+_____________________________
+
+#### Data prep
+
+_No prep required this week_
+
+_____________________________
+
+
+# Plotting data
+
+```{r}
+
+##! plot dinosaur as standalone plot
+
+dino_plot <- dino %>% 
+  filter(dataset=="dino") %>%                                        #filtering to only dino dataset
+  ggplot(aes(x=x, y=y, 
+             colour=dataset))+
+  #geom_smooth(method=lm,
+  #color="white", alpha=0.5, size=0.5) ) +                           #to add regression slope (looked ugly - removed)
+  geom_point(color="#006633", 
+             size=2.5)+
+    geom_text(aes(min(x),min(y),                                     #adding in text to confirm mean for x and y
+                label=paste(" x.mean:",round(mean(x),1),
+                            "\n y.mean:",round(mean(y),1))), 
+            size=4, 
+            family='mono', 
+            color="#006633") +               #customising font, colour and size
+  theme(legend.position = "none",
+        panel.background=element_rect(fill="#333333",               #dark theme with no gridlines
+                                      color = "#333333"),
+        plot.background = element_rect(fill = "#333333", 
+                                       color = "#333333"),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(color="white"),
+        axis.text.x = element_text(color="white")) +
+  ylim(0,108)
+
+
+##! plot 4 additional comparable datasets 
+
+facet_plot<-dino %>% 
+  filter(dataset %in% c("star", "x_shape", 
+         "bullseye", "v_lines"))  %>% #filtering out the datasets wanted
+ggplot(aes(x=x, y=y, colour=dataset))+
+  # geom_smooth(method=lm,
+  #             color="#666666", fill="#666666") +   #to add regression slope (looked ugly - removed)
+  geom_point(size=2.5, 
+             alpha=0.9)+
+  scale_color_manual(values=c("#81a9ad", "#d8b365", 
+                              "#999999", "#CC3333"))+
+    geom_hline(aes(yintercept = mean(y)), #adding in dashed hline for mean of y
+             linetype = "dashed", 
+             color = "white", 
+             size = 0.5, 
+             alpha=0.5) +
+  geom_text(aes(0,mean(x)-3,              #adding in text to accompany hline
+                label=paste("y.mean:",round(mean(y),1)), 
+                hjust=-0.001), 
+            size=3, 
+            family='mono') +     #resizing and adding custom font
+  geom_vline(aes(xintercept = mean(x)),  #adding in dashed vline for mean of x
+             linetype = "dashed", 
+             color = "white", 
+             size = 0.5, 
+             alpha=0.5) +
+  geom_text(aes(mean(x)+1,max(y)+6,     #adding in text to accompany vline
+                label=paste("x.mean:",round(mean(x),1)),
+                hjust=-0.05), 
+            size=3, 
+            family='mono') +    #resizing and adding custom font
+  theme(legend.position = "none",
+        panel.background=element_rect(fill="#333333",
+                                      color = "#333333"),
+        plot.background = element_rect(fill = "#333333",
+                                       color = "#333333"), #dark background 
+        panel.grid.major = element_blank(),                #no gridlines
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(color="white"),
+        axis.text.x = element_text(color="white"),
+        strip.background = element_blank(),           #removing facet labels
+        strip.text.x = element_blank()) +
+  ylim(0, 108) +
+  facet_wrap(~dataset, ncol=2)                       #generating grid of visuals
+
+
+##! Using patchwork to place the two plots side by side
+
+all_plots<-(dino_plot | facet_plot) +                
+  plot_annotation(title = "DatasauRus: All is not as it seems...",
+                  subtitle = "Despite very different looking plots, each has 
+the same x&y mean and x&y standard deviation!
+",
+                  caption="
+                  Graphic by: Jodie Lord | @jodielord5
+                  #TidyTuesday #R4DS") &
+                    theme(legend.position = "none",        #matching overall theme to the theme of the two singular plots
+        panel.background=element_rect(fill="#333333",
+                                      color = "#333333"),
+        plot.background = element_rect(fill = "#333333",
+                                       color = "#333333"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(color="white"),
+        axis.text.x = element_text(color="white"),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        plot.title=element_text('mono',
+                          color="white",
+                          hjust=0.5,
+                          size=25,
+                          face="bold"),
+        plot.subtitle=element_text('mono',
+                                   color="#CCCCCC",
+                                   hjust=0.5,
+                                   size=14),
+        plot.caption=element_text('mono',
+                                  color="#CCCCCC",
+                                  size=12))
+        
+
+#all_plots  
+
+```  
+
+______________________________
+
+#### Saving plot
+
+```{r}
+
+# saving plot
+ggsave(
+  here("2020/2020-Oct-Datasaurus", "OUTPUT_Datasaurus.png"),
+  plot = all_plots,
+  width = 13,
+  height = 10,
+  units = c("in", "cm", "mm"),
+  dpi = 320,
+)
+
+```
+
+
+### END
