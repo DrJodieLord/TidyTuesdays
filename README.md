@@ -5,5 +5,6 @@ A respository for me to play around with / submit projects released from the [Ti
 
 Any projects that I attempt will be submitted under their corresponding year and month directory within this repository.
 
-### 2022
-Stores most up to date entries.
+Entries can be found under:
+- 2022 (most recent)
+- 2020
